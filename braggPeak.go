@@ -5,7 +5,6 @@ import (
 
 	"go-hep.org/x/hep/hplot"
 	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/plotutil"
 	"gonum.org/v1/plot/vg"
 )
@@ -57,6 +56,48 @@ func dEdx(p *Particle, m *Material) float64 {
 	return dEdx
 }
 
+type BraggPeak struct {
+	Ts  []float64
+	dEs []float64
+	Xs  []float64
+}
+
+func NewBraggPeak(p *Particle, m *Material) *BraggPeak {
+	bp := &BraggPeak{}
+	dx := 0.1e-1 // in cm
+
+	var Ts []float64
+	var dEs []float64
+	var Xs []float64
+	n := 0
+	for p.T >= 0 {
+		n++
+		dEdx := dEdx(p, m)
+		dE := dEdx * dx
+		p.T -= dE
+		dEs = append(dEs, dE)
+		Ts = append(Ts, p.T)
+		Xprev := 0.
+		if len(Xs) > 0 {
+			Xprev = Xs[len(Xs)-1]
+		}
+		Xs = append(Xs, Xprev+dx)
+	}
+
+	bp.Ts = Ts
+	bp.dEs = dEs
+	bp.Xs = Xs
+	return bp
+}
+
+func (b *BraggPeak) Len() int {
+	return len(b.Ts)
+}
+
+func (b *BraggPeak) XY(i int) (float64, float64) {
+	return b.Xs[i], b.dEs[i]
+}
+
 func main() {
 	/*
 		material := NewMaterial(1, 16, 8, 8*10e-6)
@@ -95,34 +136,14 @@ func main() {
 		}
 	*/
 
-	material := NewMaterial(1, 4, 2, 6*13e-6)
-	proton := NewParticle(mp, 140, 1)
-	dx := 0.1e-1 // in cm
+	material := NewMaterial(1, 4, 2, 6*10e-6)
 
-	var Ts []float64
-	var dEs []float64
-	var Xs []float64
-	n := 0
-	for proton.T >= 0 {
-		n++
-		dEdx := dEdx(proton, material)
-		dE := dEdx * dx
-		proton.T -= dE
-		dEs = append(dEs, dE)
-		Ts = append(Ts, proton.T)
-		Xs = append(Xs, float64(n)*dx)
-	}
+	bp := NewBraggPeak(NewParticle(mp, 65, 1), material)
 
-	pts := make(plotter.XYs, len(Ts))
-	for i := range Ts {
-		pts[i].X = Xs[i]
-		pts[i].Y = dEs[i]
-	}
 	p, err := plot.New()
 	if err != nil {
 		panic(err)
 	}
-
 	p.Title.Text = ""
 	p.X.Label.Text = "X"
 	p.Y.Label.Text = "T"
@@ -130,7 +151,7 @@ func main() {
 	//p.X.Scale = plot.LogScale{}
 	//p.Y.Scale = plot.LogScale{}
 	p.Add(hplot.NewGrid())
-	err = plotutil.AddScatters(p, pts)
+	err = plotutil.AddScatters(p, bp)
 	if err != nil {
 		panic(err)
 	}
