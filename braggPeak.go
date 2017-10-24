@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"math"
 
 	"go-hep.org/x/hep/hplot"
 	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/plotutil"
 	"gonum.org/v1/plot/vg"
 )
@@ -52,7 +54,7 @@ func dEdx(p *Particle, m *Material) float64 {
 	beta, gamma := p.BetaGamma()
 	betagamma := beta * gamma
 	dEdx := 4 * math.Pi * me * re * re * m.Z * m.Rho / m.A * Na * p.Z * p.Z / (beta * beta) * (math.Log(2*me*betagamma*betagamma/m.I) - 2*beta*beta)
-	//fmt.Println("Debug:", p.T, p.Momentum(), beta, gamma, dEdx)
+	fmt.Println("Debug:", p.T, p.Momentum(), beta, gamma, dEdx)
 	return dEdx
 }
 
@@ -64,7 +66,7 @@ type BraggPeak struct {
 
 func NewBraggPeak(p *Particle, m *Material) *BraggPeak {
 	bp := &BraggPeak{}
-	dx := 0.1e-1 // in cm
+	dx := 0.5e-1 // in cm
 
 	var Ts []float64
 	var dEs []float64
@@ -98,66 +100,76 @@ func (b *BraggPeak) XY(i int) (float64, float64) {
 	return b.Xs[i], b.dEs[i]
 }
 
+func (b *BraggPeak) Range() float64 {
+	return b.Xs[len(b.Xs)-1]
+}
+
 func main() {
-	/*
-		material := NewMaterial(1, 16, 8, 8*10e-6)
-		Ts := make([]float64, 10000)
-		dEdxs := make([]float64, len(Ts))
-		for i := range Ts {
-			Ts[i] = 1 + float64(i)*(1e5-1)/float64(len(Ts))
-			proton := NewParticle(mp, Ts[i], 1)
-			dEdxs[i] = dEdx(proton, material)
-		}
 
-		pts := make(plotter.XYs, len(Ts))
-		for i := range Ts {
-			pts[i].X = Ts[i]
-			pts[i].Y = dEdxs[i]
-		}
-		p, err := plot.New()
-		if err != nil {
-			panic(err)
-		}
+	material := NewMaterial(1, 16, 8, 8*10e-6)
+	Ts := make([]float64, 10000)
+	dEdxs := make([]float64, len(Ts))
+	for i := range Ts {
+		Ts[i] = 1 + float64(i)*(1e5-1)/float64(len(Ts))
+		proton := NewParticle(mp, Ts[i], 1)
+		dEdxs[i] = dEdx(proton, material)
+	}
 
-		p.Title.Text = ""
-		p.X.Label.Text = "T"
-		p.Y.Label.Text = "-dE/dx"
-		//p.X.Tick.Marker = &hplot.FreqTicks{N: 10, Freq: 1}
-		//p.X.Scale = plot.LogScale{}
-		//p.Y.Scale = plot.LogScale{}
-		p.Add(hplot.NewGrid())
-		err = plotutil.AddScatters(p, pts)
-		if err != nil {
-			panic(err)
-		}
-		// Save the plot to a PNG file.
-		if err := p.Save(6*vg.Inch, 3*vg.Inch, "StoppingPower.png"); err != nil {
-			panic(err)
-		}
-	*/
-
-	material := NewMaterial(1, 4, 2, 6*10e-6)
-
-	bp := NewBraggPeak(NewParticle(mp, 65, 1), material)
-
+	pts := make(plotter.XYs, len(Ts))
+	for i := range Ts {
+		pts[i].X = Ts[i]
+		pts[i].Y = dEdxs[i]
+	}
 	p, err := plot.New()
 	if err != nil {
 		panic(err)
 	}
+
 	p.Title.Text = ""
-	p.X.Label.Text = "X"
-	p.Y.Label.Text = "T"
+	p.X.Label.Text = "T"
+	p.Y.Label.Text = "-dE/dx"
 	//p.X.Tick.Marker = &hplot.FreqTicks{N: 10, Freq: 1}
 	//p.X.Scale = plot.LogScale{}
 	//p.Y.Scale = plot.LogScale{}
 	p.Add(hplot.NewGrid())
-	err = plotutil.AddScatters(p, bp)
+	err = plotutil.AddScatters(p, pts)
 	if err != nil {
 		panic(err)
 	}
 	// Save the plot to a PNG file.
-	if err := p.Save(6*vg.Inch, 3*vg.Inch, "TvsX.png"); err != nil {
+	if err := p.Save(6*vg.Inch, 3*vg.Inch, "StoppingPower.png"); err != nil {
 		panic(err)
 	}
 
+	/*
+		// The value of I is taken from http://www.sciencedirect.com/science/article/pii/S135044870700409X
+		material := NewMaterial(1, 4, 2, 78*10e-6)
+
+		bp65 := NewBraggPeak(NewParticle(mp, 65, 1), material)
+		//bp100 := NewBraggPeak(NewParticle(mp, 100, 1), material)
+		//bp150 := NewBraggPeak(NewParticle(mp, 150, 1), material)
+		//bp200 := NewBraggPeak(NewParticle(mp, 200, 1), material)
+
+		p, err := plot.New()
+		if err != nil {
+			panic(err)
+		}
+		p.Title.Text = ""
+		p.X.Label.Text = "X"
+		p.Y.Label.Text = "T"
+		//p.X.Tick.Marker = &hplot.FreqTicks{N: 10, Freq: 1}
+		//p.X.Scale = plot.LogScale{}
+		//p.Y.Scale = plot.LogScale{}
+		p.Add(hplot.NewGrid())
+		err = plotutil.AddScatters(p, bp65) //, bp100, bp150, bp200)
+		if err != nil {
+			panic(err)
+		}
+		// Save the plot to a PNG file.
+		if err := p.Save(6*vg.Inch, 3*vg.Inch, "dEvsX.png"); err != nil {
+			panic(err)
+		}
+
+		fmt.Println(bp65.Range()) //, bp100.Range(), bp150.Range(), bp200.Range())
+	*/
 }
